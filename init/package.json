@@ -1,0 +1,9 @@
+{
+  "name": "init-opensearch",
+  "version": "1.0.0",
+  "dependencies": {
+    "@opensearch-project/opensearch": "^2.5.0",
+    "pg": "^8.11.3"
+  }
+}
+

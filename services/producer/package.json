@@ -1,0 +1,11 @@
+{
+  "name": "producer",
+  "version": "1.0.0",
+  "description": "Simulates app writes → Kafka",
+  "main": "index.js",
+  "scripts": { "start": "node index.js" },
+  "dependencies": {
+    "kafkajs": "^2.2.4",
+    "uuid": "^9.0.0"
+  }
+}

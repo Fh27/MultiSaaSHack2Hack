@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Multi-Tenant Search MVP</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+  header{background:linear-gradient(135deg,#1e40af,#7c3aed);padding:20px 32px;display:flex;align-items:center;gap:16px;box-shadow:0 4px 24px #0005}
+  header h1{font-size:1.5rem;font-weight:700;letter-spacing:-.5px}
+  header .badge{background:#10b981;color:#fff;border-radius:999px;padding:2px 12px;font-size:.75rem;font-weight:600}
+  .tenant-bar{background:#1e293b;padding:12px 32px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #334155}
+  .tenant-bar label{font-size:.85rem;color:#94a3b8}
+  .tenant-bar select{background:#0f172a;border:1px solid #475569;color:#e2e8f0;padding:6px 12px;border-radius:8px;font-size:.9rem;cursor:pointer}
+  .tenant-bar .tier-badge{font-size:.7rem;padding:2px 8px;border-radius:999px;font-weight:600}
+  .tier-shared{background:#1e40af22;color:#60a5fa;border:1px solid #1e40af}
+  .tier-dedicated{background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed}
+  .main{display:grid;grid-template-columns:260px 1fr;gap:0;min-height:calc(100vh - 120px)}
+  .sidebar{background:#1e293b;border-right:1px solid #334155;padding:20px;overflow-y:auto}
+  .sidebar h3{font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:#64748b;margin-bottom:12px}
+  .facet-group{margin-bottom:24px}
+  .facet-group h4{font-size:.85rem;font-weight:600;color:#94a3b8;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .facet-item{display:flex;align-items:center;justify-content:space-between;padding:4px 8px;border-radius:6px;cursor:pointer;transition:background .15s;font-size:.85rem}
+  .facet-item:hover,.facet-item.active{background:#1e40af33;color:#60a5fa}
+  .facet-item.active{font-weight:600}
+  .facet-count{background:#334155;color:#94a3b8;border-radius:999px;padding:1px 7px;font-size:.75rem}
+  .price-range{display:flex;gap:8px;margin-top:4px}
+  .price-range input{background:#0f172a;border:1px solid #475569;color:#e2e8f0;padding:6px;border-radius:6px;width:100%;font-size:.8rem}
+  .content{padding:24px;overflow-y:auto}
+  .search-wrap{position:relative;margin-bottom:20px}
+  .search-input{width:100%;background:#1e293b;border:2px solid #334155;color:#e2e8f0;padding:14px 20px;border-radius:12px;font-size:1rem;transition:border-color .2s;outline:none}
+  .search-input:focus{border-color:#6366f1}
+  .suggestions{position:absolute;top:100%;left:0;right:0;background:#1e293b;border:1px solid #334155;border-radius:0 0 12px 12px;z-index:100;overflow:hidden;box-shadow:0 8px 32px #0008}
+  .suggestion-item{padding:10px 20px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;font-size:.9rem;transition:background .15s}
+  .suggestion-item:hover{background:#334155}
+  .suggestion-meta{font-size:.75rem;color:#64748b}
+  .results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .results-count{font-size:.9rem;color:#94a3b8}
+  .cache-badge{background:#10b98122;color:#10b981;border:1px solid #10b981;border-radius:999px;padding:2px 10px;font-size:.75rem}
+  .results-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+  .product-card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:16px;transition:border-color .2s,transform .15s}
+  .product-card:hover{border-color:#6366f1;transform:translateY(-2px)}
+  .product-name{font-size:1rem;font-weight:600;margin-bottom:6px;line-height:1.3}
+  .product-name em{background:#6366f144;color:#a5b4fc;padding:0 2px;border-radius:3px;font-style:normal}
+  .product-meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .meta-tag{background:#0f172a;border:1px solid #334155;border-radius:6px;padding:2px 8px;font-size:.75rem;color:#94a3b8}
+  .product-price{font-size:1.25rem;font-weight:700;color:#10b981}
+  .product-desc{font-size:.8rem;color:#64748b;margin-bottom:10px;line-height:1.4}
+  .product-desc em{background:#6366f144;color:#a5b4fc;font-style:normal}
+  .in-stock{color:#10b981;font-size:.75rem;font-weight:600}
+  .out-stock{color:#ef4444;font-size:.75rem;font-weight:600}
+  .tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+  .tag{background:#312e81;color:#a5b4fc;border-radius:999px;padding:2px 8px;font-size:.7rem}
+  .pagination{display:flex;align-items:center;gap:8px;margin-top:24px;justify-content:center}
+  .page-btn{background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:8px 16px;border-radius:8px;cursor:pointer;transition:background .15s}
+  .page-btn:hover{background:#334155}
+  .page-btn.active{background:#6366f1;border-color:#6366f1}
+  .live-indicator{display:flex;align-items:center;gap:6px;font-size:.75rem;color:#10b981}
+  .live-dot{width:8px;height:8px;background:#10b981;border-radius:50%;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+  .empty{text-align:center;padding:60px;color:#475569}
+  .empty-icon{font-size:3rem;margin-bottom:12px}
+  .bulk-import-banner{background:#1e40af22;border:1px solid #1e40af;border-radius:10px;padding:14px 20px;margin-bottom:20px;display:none;align-items:center;gap:12px;font-size:.875rem}
+  .bulk-import-banner.active{display:flex}
+  .import-progress{flex:1;background:#0f172a;border-radius:999px;height:6px;overflow:hidden}
+  .import-bar{height:100%;background:linear-gradient(90deg,#6366f1,#10b981);border-radius:999px;transition:width .3s}
+  .stats-row{display:flex;gap:16px;margin-bottom:20px}
+  .stat-card{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px 16px;flex:1;text-align:center}
+  .stat-val{font-size:1.5rem;font-weight:700;color:#a5b4fc}
+  .stat-lbl{font-size:.75rem;color:#64748b}
+  .clear-filters{background:#ef444422;color:#ef4444;border:1px solid #ef4444;border-radius:6px;padding:4px 10px;font-size:.75rem;cursor:pointer;margin-bottom:12px;width:100%}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🔍 Multi-Tenant Search Platform</h1>
+    <div style="font-size:.8rem;color:#bfdbfe;margin-top:2px">Domain D MVP — Hack to Hire 2.0 | Phenom</div>
+  </div>
+  <div class="live-indicator" id="liveIndicator" style="margin-left:auto">
+    <div class="live-dot"></div>
+    <span>Live indexing</span>
+  </div>
+</header>
+
+<div class="tenant-bar">
+  <label>🏢 Tenant:</label>
+  <select id="tenantSelect">
+    <option value="tenant_acme">Acme Corp (shared)</option>
+    <option value="tenant_globex">Globex Inc (shared)</option>
+    <option value="tenant_initech">Initech (dedicated)</option>
+  </select>
+  <span id="tierBadge" class="tier-badge tier-shared">shared</span>
+  <span style="font-size:.8rem;color:#475569;margin-left:auto">Switch tenants to verify isolation →</span>
+</div>
+
+<div class="main">
+  <!-- SIDEBAR FACETS -->
+  <div class="sidebar">
+    <h3>Filters</h3>
+    <button class="clear-filters" onclick="clearFilters()">✕ Clear all filters</button>
+
+    <div class="facet-group" id="facet-category">
+      <h4>📦 Category</h4>
+      <div id="facet-category-items"></div>
+    </div>
+
+    <div class="facet-group" id="facet-brand">
+      <h4>🏷️ Brand</h4>
+      <div id="facet-brand-items"></div>
+    </div>
+
+    <div class="facet-group">
+      <h4>💰 Price Range</h4>
+      <div class="price-range">
+        <input type="number" id="minPrice" placeholder="Min" oninput="debounceSearch()" />
+        <input type="number" id="maxPrice" placeholder="Max" oninput="debounceSearch()" />
+      </div>
+    </div>
+
+    <div class="facet-group" id="facet-stock">
+      <h4>✅ Availability</h4>
+      <div id="facet-stock-items"></div>
+    </div>
+
+    <div class="facet-group" id="facet-tags">
+      <h4>🏷 Tags</h4>
+      <div id="facet-tags-items"></div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="content">
+    <!-- Bulk import banner -->
+    <div class="bulk-import-banner" id="importBanner">
+      <span>📦 Bulk import in progress…</span>
+      <div class="import-progress">
+        <div class="import-bar" id="importBar" style="width:0%"></div>
+      </div>
+      <span id="importPct">0%</span>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-val" id="stat-total">—</div><div class="stat-lbl">Total Results</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat-price-min">—</div><div class="stat-lbl">Min Price</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat-price-max">—</div><div class="stat-lbl">Max Price</div></div>
+      <div class="stat-card"><div class="stat-val" id="stat-price-avg">—</div><div class="stat-lbl">Avg Price</div></div>
+    </div>
+
+    <!-- Search -->
+    <div class="search-wrap">
+      <input type="text" class="search-input" id="searchInput"
+             placeholder="Search products… (typeahead enabled)"
+             oninput="handleInput(this.value)"
+             onkeydown="handleKey(event)"
+             autocomplete="off"/>
+      <div class="suggestions" id="suggestions" style="display:none"></div>
+    </div>
+
+    <!-- Results header -->
+    <div class="results-header">
+      <div class="results-count" id="resultsCount">Enter a search query or browse all products</div>
+      <div id="cacheBadge"></div>
+    </div>
+
+    <!-- Results -->
+    <div class="results-grid" id="resultsGrid"></div>
+
+    <!-- Pagination -->
+    <div class="pagination" id="pagination"></div>
+  </div>
+</div>
+
+<script>
+const API = "http://localhost:3001";
+let currentTenant = "tenant_acme";
+let currentQ = "";
+let currentFilters = {};
+let currentPage = 1;
+let typeaheadTimer;
+let searchTimer;
+let suggestionIdx = -1;
+let lastResults = null;
+
+// Init: load tenants from API
+async function loadTenants() {
+  try {
+    const r = await fetch(`${API}/tenants`);
+    const tenants = await r.json();
+    const sel = document.getElementById("tenantSelect");
+    sel.innerHTML = tenants.map(t => `<option value="${t.tenant_id}">${t.name} (${t.tier})</option>`).join("");
+    updateTierBadge(tenants[0]?.tier || "shared");
+  } catch(e) { console.warn("Could not load tenants from API, using defaults"); }
+}
+
+function updateTierBadge(tier) {
+  const badge = document.getElementById("tierBadge");
+  badge.textContent = tier;
+  badge.className = `tier-badge tier-${tier}`;
+}
+
+document.getElementById("tenantSelect").addEventListener("change", e => {
+  currentTenant = e.target.value;
+  const selectedOption = e.target.selectedOptions[0].text;
+  const tier = selectedOption.includes("dedicated") ? "dedicated" : "shared";
+  updateTierBadge(tier);
+  currentPage = 1;
+  currentFilters = {};
+  doSearch();
+});
+
+// Typeahead
+function handleInput(q) {
+  currentQ = q;
+  currentPage = 1;
+  hideSuggestions();
+  clearTimeout(typeaheadTimer);
+  clearTimeout(searchTimer);
+  if (q.length >= 2) {
+    typeaheadTimer = setTimeout(() => fetchSuggestions(q), 200);
+  }
+  searchTimer = setTimeout(() => doSearch(), 400);
+}
+
+async function fetchSuggestions(q) {
+  try {
+    const r = await fetch(`${API}/typeahead?q=${encodeURIComponent(q)}&tenant_id=${currentTenant}`);
+    const { suggestions } = await r.json();
+    showSuggestions(suggestions);
+  } catch(e) {}
+}
+
+function showSuggestions(items) {
+  const box = document.getElementById("suggestions");
+  if (!items || !items.length) { hideSuggestions(); return; }
+  box.innerHTML = items.map((s, i) =>
+    `<div class="suggestion-item" data-idx="${i}" onclick="selectSuggestion('${s.name.replace(/'/g,"\\'")}')">
+      <span>${highlight(s.name, currentQ)}</span>
+      <span class="suggestion-meta">${s.category || ""} · ${s.brand || ""}</span>
+    </div>`
+  ).join("");
+  box.style.display = "block";
+}
+
+function hideSuggestions() {
+  document.getElementById("suggestions").style.display = "none";
+  suggestionIdx = -1;
+}
+
+function selectSuggestion(name) {
+  document.getElementById("searchInput").value = name;
+  currentQ = name;
+  hideSuggestions();
+  doSearch();
+}
+
+function handleKey(e) {
+  const box = document.getElementById("suggestions");
+  const items = box.querySelectorAll(".suggestion-item");
+  if (e.key === "ArrowDown") { suggestionIdx = Math.min(suggestionIdx+1, items.length-1); highlightSuggestion(items); e.preventDefault(); }
+  else if (e.key === "ArrowUp") { suggestionIdx = Math.max(suggestionIdx-1, -1); highlightSuggestion(items); e.preventDefault(); }
+  else if (e.key === "Enter") { if (suggestionIdx >= 0 && items[suggestionIdx]) { items[suggestionIdx].click(); } else { hideSuggestions(); doSearch(); } }
+  else if (e.key === "Escape") hideSuggestions();
+}
+
+function highlightSuggestion(items) {
+  items.forEach((el, i) => el.style.background = i === suggestionIdx ? "#334155" : "");
+}
+
+document.addEventListener("click", e => { if (!e.target.closest(".search-wrap")) hideSuggestions(); });
+
+// Facet selection
+function setFilter(key, value) {
+  if (currentFilters[key] === value) delete currentFilters[key];
+  else currentFilters[key] = value;
+  currentPage = 1;
+  doSearch();
+}
+
+function clearFilters() {
+  currentFilters = {};
+  document.getElementById("minPrice").value = "";
+  document.getElementById("maxPrice").value = "";
+  currentPage = 1;
+  doSearch();
+}
+
+function debounceSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => doSearch(), 500);
+}
+
+// Main search
+async function doSearch() {
+  const min = document.getElementById("minPrice").value;
+  const max = document.getElementById("maxPrice").value;
+  const params = new URLSearchParams({
+    q: currentQ,
+    tenant_id: currentTenant,
+    page: currentPage,
+    size: 12,
+    ...currentFilters,
+    ...(min ? { min_price: min } : {}),
+    ...(max ? { max_price: max } : {}),
+  });
+  try {
+    const r = await fetch(`${API}/search?${params}`);
+    const data = await r.json();
+    lastResults = data;
+    renderResults(data);
+    renderFacets(data.facets);
+    renderPagination(data.total, currentPage, 12);
+    renderStats(data);
+    const cacheBadge = document.getElementById("cacheBadge");
+    cacheBadge.innerHTML = data.cached ? '<span class="cache-badge">⚡ Cached</span>' : '';
+  } catch(e) {
+    document.getElementById("resultsGrid").innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><p>Could not connect to API. Is it running?</p><p style="font-size:.8rem;margin-top:8px">Run: npm start in query-api directory</p></div>`;
+  }
+}
+
+function renderStats(data) {
+  document.getElementById("stat-total").textContent = data.total?.toLocaleString() || 0;
+  const ps = data.facets?.price_stats;
+  document.getElementById("stat-price-min").textContent = ps?.min != null ? `$${ps.min.toFixed(0)}` : "—";
+  document.getElementById("stat-price-max").textContent = ps?.max != null ? `$${ps.max.toFixed(0)}` : "—";
+  document.getElementById("stat-price-avg").textContent = ps?.avg != null ? `$${ps.avg.toFixed(0)}` : "—";
+}
+
+function highlight(text, q) {
+  if (!q || !text) return text || "";
+  return text.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")})`, "gi"), "<em>$1</em>");
+}
+
+function renderResults(data) {
+  const grid = document.getElementById("resultsGrid");
+  document.getElementById("resultsCount").textContent = `${data.total?.toLocaleString() || 0} results for "${currentQ || '*'}"`;
+  if (!data.hits || !data.hits.length) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">🔍</div><p>No products found for this tenant</p></div>`;
+    return;
+  }
+  grid.innerHTML = data.hits.map(h => {
+    const hl_name = h.highlight?.name?.[0] || h.name || "";
+    const hl_desc = h.highlight?.description?.[0] || (h.description || "").slice(0, 120);
+    return `
+    <div class="product-card">
+      <div class="product-name">${hl_name}</div>
+      <div class="product-meta">
+        <span class="meta-tag">📦 ${h.category || "—"}</span>
+        <span class="meta-tag">🏷 ${h.brand || "—"}</span>
+        <span class="${h.in_stock ? 'in-stock' : 'out-stock'}">${h.in_stock ? "✅ In Stock" : "❌ Out of Stock"}</span>
+      </div>
+      <div class="product-desc">${hl_desc}${(h.description||"").length > 120 ? "…" : ""}</div>
+      <div class="product-price">$${(h.price || 0).toFixed(2)}</div>
+      <div class="tags">${(h.tags || []).map(t => `<span class="tag">${t}</span>`).join("")}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderFacets(facets) {
+  if (!facets) return;
+  renderFacetGroup("facet-category-items", facets.categories || [], "category");
+  renderFacetGroup("facet-brand-items",    facets.brands     || [], "brand");
+  renderFacetGroup("facet-stock-items",    (facets.in_stock  || []).map(b => ({ key: b.key_as_string || String(b.key), doc_count: b.doc_count })), "in_stock");
+  renderFacetGroup("facet-tags-items",     facets.tags       || [], "tags");
+}
+
+function renderFacetGroup(containerId, buckets, filterKey) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = buckets.slice(0, 10).map(b => {
+    const isActive = currentFilters[filterKey] === String(b.key);
+    return `<div class="facet-item ${isActive ? "active" : ""}" onclick="setFilter('${filterKey}','${b.key}')">
+      <span>${filterKey === "in_stock" ? (b.key ? "✅ In Stock" : "❌ Out of Stock") : b.key}</span>
+      <span class="facet-count">${b.doc_count}</span>
+    </div>`;
+  }).join("");
+}
+
+function renderPagination(total, page, size) {
+  const pages = Math.ceil(total / size);
+  const el = document.getElementById("pagination");
+  if (pages <= 1) { el.innerHTML = ""; return; }
+  const start = Math.max(1, page - 2), end = Math.min(pages, page + 2);
+  let html = page > 1 ? `<button class="page-btn" onclick="goPage(${page-1})">← Prev</button>` : "";
+  for (let p = start; p <= end; p++) {
+    html += `<button class="page-btn ${p === page ? "active" : ""}" onclick="goPage(${p})">${p}</button>`;
+  }
+  if (page < pages) html += `<button class="page-btn" onclick="goPage(${page+1})">Next →</button>`;
+  el.innerHTML = html;
+}
+
+function goPage(p) { currentPage = p; doSearch(); window.scrollTo(0, 0); }
+
+// Bulk import simulation
+function simulateBulkImport() {
+  const banner = document.getElementById("importBanner");
+  const bar = document.getElementById("importBar");
+  const pct = document.getElementById("importPct");
+  banner.classList.add("active");
+  let progress = 0;
+  const interval = setInterval(() => {
+    progress += Math.random() * 8 + 2;
+    if (progress >= 100) { progress = 100; clearInterval(interval); setTimeout(() => banner.classList.remove("active"), 2000); }
+    bar.style.width = progress.toFixed(0) + "%";
+    pct.textContent = progress.toFixed(0) + "%";
+  }, 300);
+}
+
+// Trigger bulk import sim every 30s for demo
+setInterval(simulateBulkImport, 30000);
+
+// Init
+loadTenants().then(() => doSearch());
+// Auto-refresh results every 5s to show live indexing
+setInterval(() => { if (document.visibilityState === "visible") doSearch(); }, 5000);
+</script>
+</body>
+</html>
