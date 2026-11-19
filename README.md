@@ -7,9 +7,6 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7.0-red.svg)](https://redis.io/)
 
-> **Phenom Engineering · Hack to Hire 2.0 · Domain D MVP**  
-> A high-throughput, near-real-time ($< 5\text{ s}$ SLA), isolated multi-tenant search and typeahead platform built with Kafka, OpenSearch, PostgreSQL, Redis, and Node.js.
-
 ---
 
 ## Table of Contents
